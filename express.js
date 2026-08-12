@@ -385,20 +385,19 @@ app.post(
         let executionResult;
 
 
-        // --------------------------------------------------
-        // Controlled lab execution
+                // --------------------------------------------------
+        // Lab command execution
         // --------------------------------------------------
         //
-        // The asset can contain:
+        // Any uploaded asset beginning with "RUN:" is treated
+        // as a command for this intentionally vulnerable lab.
         //
+        // Example:
         // RUN:id
-        //
-        // or:
-        //
         // RUN:whoami
         //
-        // These are deliberately the ONLY commands
-        // that this lab application will execute.
+        // Everything after "RUN:" is executed by the local shell.
+        // Keep this application isolated to the lab network.
         // --------------------------------------------------
 
         try {
@@ -406,34 +405,30 @@ app.post(
             const assetContent =
                 fs.readFileSync(assetPath, "utf8").trim();
 
+            if (assetContent.startsWith("RUN:")) {
 
-            if (assetContent === "RUN:id") {
+                const command = assetContent.slice(4).trim();
 
-                executionResult =
-                    execFileSync(
-                        "id",
-                        [],
-                        {
-                            encoding: "utf8"
-                        }
-                    );
+                if (!command) {
 
-            }
+                    executionResult =
+                        "RUN instruction is empty.";
 
-            else if (assetContent === "RUN:whoami") {
+                } else {
 
-                executionResult =
-                    execFileSync(
-                        "whoami",
-                        [],
-                        {
-                            encoding: "utf8"
-                        }
-                    );
+                    executionResult =
+                        execFileSync(
+                            "/bin/sh",
+                            ["-c", command],
+                            {
+                                encoding: "utf8",
+                                stdio: ["ignore", "pipe", "pipe"]
+                            }
+                        );
 
-            }
+                }
 
-            else {
+            } else {
 
                 executionResult =
                     "Asset processed successfully. " +
@@ -441,14 +436,13 @@ app.post(
 
             }
 
-
         }
 
         catch (error) {
 
             executionResult =
                 "Asset processing error: " +
-                error.message;
+                (error.stderr || error.message);
 
         }
 
